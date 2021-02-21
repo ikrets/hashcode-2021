@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import sys
 
-with open("data/e_many_teams.in", "r") as fp:
+with open(sys.argv[1], "r") as fp:
     lines = fp.readlines()
     M, T2, T3, T4 = [int(i) for i in lines[0].strip("\n").split()]
     pizzas = []
@@ -15,22 +17,30 @@ left_pizzas = M - 2 * T2
 fillable_3_teams = left_pizzas // 3
 
 pizzas_by_ingridient_count = sorted(pizzas, key=lambda p: len(p[1]), reverse=True)
+plt.hist([len(p[1]) for p in pizzas], bins=40)
+plt.savefig("data/e_histogram.png")
 
 output = []
-for m in range(T2):
-    output.append([2, pizzas_by_ingridient_count[m][0]])
-for m in range(T2, T2 + fillable_3_teams):
-    output.append([3, pizzas_by_ingridient_count[m][0]])
+fillable_4 = min(M // 4, T4)
+for m in range(fillable_4):
+    output.append([4, pizzas_by_ingridient_count[m][0],
+                      pizzas_by_ingridient_count[fillable_4 + m][0],
+                      pizzas_by_ingridient_count[2 * fillable_4 + m][0],
+                      pizzas_by_ingridient_count[3 * fillable_4 + m][0]])
+    
+fillable_3 = min((M - fillable_4 * 4) // 3, T3)
+for m in range(fillable_3):
+    base = fillable_4 * 4
+    output.append([3, pizzas_by_ingridient_count[base + m][0],
+                      pizzas_by_ingridient_count[base + fillable_3 + m][0],
+                      pizzas_by_ingridient_count[base + 2 * fillable_3 + m][0]])
 
-for m in range(T2):
-    output[m].append(pizzas_by_ingridient_count[m + T2 + fillable_3_teams][0])
-for m in range(fillable_3_teams):
-    output[T2 + m].extend([
-        pizzas_by_ingridient_count[2 * T2 + fillable_3_teams + m][0],
-        pizzas_by_ingridient_count[2 * T2 + 2 * fillable_3_teams + m][0]]
-    )
+fillable_2 = min((M - fillable_4 * 4 - fillable_3 * 3) // 2, T2)
+for m in range(fillable_2):
+    base = fillable_4 * 4 + fillable_3 * 3
+    output.append([2, pizzas_by_ingridient_count[base + m][0],
+                      pizzas_by_ingridient_count[base + fillable_2 + m][0]])
 
-int_stats = {2: [], 3: []}
 total_score = 0
 for o in output[1:]:
     team_size = int(o[0])
@@ -40,12 +50,8 @@ for o in output[1:]:
     all_ingridients = set()
     for pizza in ps:
         all_ingridients.update(pizzas[pizza][1])
-    int_stats[team_size].append(total - len(all_ingridients))
     total_score += len(all_ingridients)**2
 print(f"Total score: {total_score}")
-
-for team_size in [2, 3]:
-    print(f"Teams size {team_size}: {np.mean(int_stats[team_size])} +- {np.std(int_stats[team_size])}")
 
 total_sum = 0
 for o in output[1:]:
@@ -61,11 +67,7 @@ def score(output):
         total_score += len(all_ingridients) ** 2
     return total_score
         
-
-
-    
-
-with open("data/e_many_teams.out", "w") as fp:
+with open(sys.argv[2], "w") as fp:
     fp.write(f"{len(output)}\n")
     for o in output:
         fp.write(f"{' '.join(str(o_elem) for o_elem in o)}\n")
