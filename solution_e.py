@@ -1,4 +1,3 @@
-import itertools
 import numpy as np
 
 with open("data/e_many_teams.in", "r") as fp:
@@ -49,6 +48,17 @@ total_sum = 0
 for o in output[1:]:
     total_sum += sum(len(pizzas[oo][1]) for oo in o)**2
 print(f"Total sum with intersections ignored: {total_sum}")
+
+def score(output):
+    total_score = 0
+    for o in output[1:]:
+        all_ingridients = set()
+        for pizza in o[1:]:
+            all_ingridients.update(pizzas[pizza][1])
+        total_score += len(all_ingridients) ** 2
+    return total_score
+        
+
 
     
 
