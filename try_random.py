@@ -32,12 +32,13 @@ def produce_random():
     current_index = 0
 
     while whats_left() and len(available_pizzas) > min(whats_left()):
-        random_team_size = random.choice(whats_left())
-        random_indices = indices[current_index: current_index + random_team_size]
-        current_index += random_team_size
-        solution.append([random_team_size, *random_indices])
+        # random_team_size = random.choice(whats_left())
+        team_size = max(whats_left())
+        random_indices = indices[current_index: current_index + team_size]
+        current_index += team_size
+        solution.append([team_size, *random_indices])
         available_pizzas.difference_update(random_indices)
-        left[random_team_size] -= 1
+        left[team_size] -= 1
 
     return solution
         
@@ -62,7 +63,9 @@ with open(output_file, "w") as fp:
 random_scores = []
 for i in tqdm.trange(n_iterations):
     random_scores.append(score(produce_random()))
-    tqdm.tqdm.write(f"Current average score: {np.mean(random_scores):0.2f}")
+    tqdm.tqdm.write(f"Current average score: {np.mean(random_scores):0.2f}, best: {np.max(random_scores)}")
 
 print(np.mean(random_scores))
+print(max(random_scores))
+
 
