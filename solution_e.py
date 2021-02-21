@@ -18,19 +18,20 @@ pizzas_by_ingridient_count = sorted(pizzas, key=lambda p: len(p[1]), reverse=Tru
 
 output = []
 for m in range(T2):
-    output.append([2, pizzas[m][0]])
+    output.append([2, pizzas_by_ingridient_count[m][0]])
 for m in range(T2, T2 + fillable_3_teams):
-    output.append([3, pizzas[m][0]])
+    output.append([3, pizzas_by_ingridient_count[m][0]])
 
 for m in range(T2):
-    output[m].append(pizzas[m + T2 + fillable_3_teams][0])
+    output[m].append(pizzas_by_ingridient_count[m + T2 + fillable_3_teams][0])
 for m in range(fillable_3_teams):
     output[T2 + m].extend([
-        pizzas[2 * T2 + fillable_3_teams + m][0],
-        pizzas[2 * T2 + 2 * fillable_3_teams + m][0]]
+        pizzas_by_ingridient_count[2 * T2 + fillable_3_teams + m][0],
+        pizzas_by_ingridient_count[2 * T2 + 2 * fillable_3_teams + m][0]]
     )
 
 int_stats = {2: [], 3: []}
+total_score = 0
 for o in output[1:]:
     team_size = int(o[0])
     ps = o[1:]
@@ -40,6 +41,8 @@ for o in output[1:]:
     for pizza in ps:
         all_ingridients.update(pizzas[pizza][1])
     int_stats[team_size].append(total - len(all_ingridients))
+    total_score += len(all_ingridients)**2
+print(f"Total score: {total_score}")
 
 for team_size in [2, 3]:
     print(f"Teams size {team_size}: {np.mean(int_stats[team_size])} +- {np.std(int_stats[team_size])}")
