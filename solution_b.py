@@ -65,8 +65,8 @@ for counter in range(T4-12):
     )
     for_score.append(len(ingrs)**2)
 
-
+print(len(deliveries))
 for item in deliveries:
-    print(item)
+    print(*item)
 
 # print(sum(for_score))
