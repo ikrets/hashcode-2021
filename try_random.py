@@ -1,16 +1,17 @@
 import sys
 import numpy as np
 from copy import deepcopy
+from os import path
 import random
 import tqdm
 
 input_file = sys.argv[1]
-n_iterations = int(sys.argv[2])
-output_file = sys.argv[3]
+n_iterations = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+output_file = sys.argv[3] if len(sys.argv) > 3 else None
 
-with open(sys.argv[1], "r") as fp:
+with open(input_file, "r") as fp:
     lines = fp.readlines()
-    M, T2, T3, T4 = [int(i) for i in lines[0].strip("\n").split()]
+    M, T2, T3, T4 = map(int, lines[0].split())
     pizzas = []
 
     for p in range(M):
@@ -25,7 +26,6 @@ def produce_random():
     def whats_left():
         return [i for i, v in left.items() if v]
 
-        
     solution = []
     indices = list(range(M))
     random.shuffle(indices)
@@ -41,9 +41,6 @@ def produce_random():
         left[team_size] -= 1
 
     return solution
-        
-
-    
 
 def score(solution):
     total_score = 0
@@ -54,11 +51,13 @@ def score(solution):
         total_score += len(all_ingridients) ** 2
     return total_score
 
-random_solution = produce_random()
-with open(output_file, "w") as fp:
-    fp.write(f"{len(random_solution)}\n")
-    for s in random_solution:
-        fp.write(f"{' '.join(str(ss) for ss in s)}\n")
+
+if output_file:
+    random_solution = produce_random()
+    with open(output_file, "w") as fp:
+        fp.write(f"{len(random_solution)}\n")
+        for s in random_solution:
+            fp.write(f"{' '.join(str(ss) for ss in s)}\n")
 
 random_scores = []
 for i in tqdm.trange(n_iterations):
@@ -68,4 +67,20 @@ for i in tqdm.trange(n_iterations):
 print(np.mean(random_scores))
 print(max(random_scores))
 
-
+print(input_file)
+output_file_tmpl = path.splitext(input_file)[0] + '_random'
+best_score = np.max(random_scores)
+try:
+    print('starting endless search...')
+    while True:
+        sol = produce_random()
+        sc = score(sol)
+        if sc > best_score:
+            print(f'\t* new best score found {best_score} -> {sc}')
+            best_score = sc
+            with open(output_file_tmpl + f'_{sc}.out', "w") as fp:
+                fp.write(f"{len(sol)}\n")
+                for s in sol:
+                    fp.write(f"{' '.join(str(_) for _ in s)}\n")
+except:
+    print(f'\t*** final best score: {best_score} ***')
