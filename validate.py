@@ -1,9 +1,5 @@
 import os, sys
 from collections import namedtuple
-from pprint import pprint
-import pandas as pd
-from tqdm import tqdm
-import random
 
 # File format
 # The first line of the input file contains the following integer numbers separated by single spaces:
