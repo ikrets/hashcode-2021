@@ -51,24 +51,23 @@ with open(input_file, "r") as f:
 
 cars = [Vehicle(idx) for idx in range(VEHICLES)]
 
-
 for step in tqdm(range(STEPS)):
     for car in cars:
-        if car.steps_left == 0:
-            if len(car.rides_done) > 0:
-                car.row, car.col = car.rides_done[-1].x, car.rides_done[-1].y
-            ride_list.sort(
-                key=lambda ride: (
-                    -distance(car.row, car.col, ride.a, ride.b), # to pop closest to car
-                    ride.distance, # longest distance first
+        if len(ride_list):
+            if car.steps_left == 0:
+                if len(car.rides_done) > 0:
+                    car.row, car.col = car.rides_done[-1].x, car.rides_done[-1].y
+                ride_list.sort(
+                    key=lambda ride: (
+                        -distance(car.row, car.col, ride.a, ride.b), # to pop closest to car
+                        ride.distance, # longest distance first
+                    )
                 )
-            )
-            ride = ride_list.pop()
-            car.steps_left = ride.distance
-            if ride.distance <= STEPS:
-                car.rides_done.append(ride)
-
-        car.steps_left -= 1
+                ride = ride_list.pop()
+                car.steps_left = ride.distance + distance(car.row, car.col, ride.a, ride.b)
+                if ride.distance <= STEPS:
+                    car.rides_done.append(ride)
+            car.steps_left -= 1
 
 
 
