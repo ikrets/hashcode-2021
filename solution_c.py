@@ -54,6 +54,8 @@ cars = [Vehicle(idx) for idx in range(VEHICLES)]
 while STEPS > 0 and len(ride_list) > 0:
     for car in cars:
         if car.steps_left == 0:
+            if len(car.rides_done) > 0:
+                car.row, car.col = car.rides_done[-1].x, car.rides_done[-1].y
             ride_list.sort(
                 key=lambda ride: (
                     -distance(car.row, car.col, ride.a, ride.b), # to pop closest to car
@@ -62,7 +64,7 @@ while STEPS > 0 and len(ride_list) > 0:
             )
             ride = ride_list.pop()
             car.steps_left = ride.distance
-            car.rides_done.append(ride.idx)
+            car.rides_done.append(ride)
 
         car.steps_left -= 1
         STEPS -= 1
@@ -72,9 +74,5 @@ while STEPS > 0 and len(ride_list) > 0:
 with open(output_file, "w") as f:
     for car in cars:
         M = len(car.rides_done)
-        rides_idxes = car.rides_done
+        rides_idxes = " ".join([str(i.idx) for i in car.rides_done])
         f.write(f'{M} {rides_idxes}\n')
-
-
-
-
