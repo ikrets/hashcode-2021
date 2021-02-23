@@ -3,6 +3,7 @@ import numpy as np
 import sys
 from pathlib import Path
 import random
+from tqdm import trange
 
 input_file, output_file = [Path(p) for p in sys.argv[1:3]]
 
@@ -43,6 +44,7 @@ rides_by_start = sorted(problem.rides, key=lambda r: r.s)
 taxi_free_from = {t: 0 for t in range(problem.F)}
 taxi_position = {t: [0, 0] for t in range(problem.F)}
 taxi_rides = {t: [] for t in range(problem.F)}
+taxi_idle_time = {t: 0 for t in range(problem.F)}
 
 def distance_to_start(taxi, ride):
     pos = taxi_position[taxi]
@@ -53,12 +55,12 @@ def end_time(taxi, ride):
 
 def ride_possible(taxi, ride, current_time):
     start_time = current_time + distance_to_start(taxi, ride)
-    end_time = start_time + ride.length
+    end_time = max(start_time, ride.s) + ride.length
 
-    return start_time >= ride.s and end_time <= ride.f
+    return end_time <= ride.f 
     
 current_ride = 0
-for t in range(problem.T):
+for t in trange(problem.T):
     if current_ride >= len(rides_by_start):
         break
 
@@ -66,10 +68,9 @@ for t in range(problem.T):
     no_next = False
 
     for taxi in possible_taxis:
-        # action = random.choice(["pick", "skip", "drop"])
-        action = "pick"
+        action = random.choice(["pick", "skip", "drop"])
         ride = rides_by_start[current_ride]
-        if not ride_possible(taxi, ride, t):
+        if not ride_possible(taxi, ride, taxi_idle_time[taxi]):
             continue
 
         if action == "pick":
@@ -77,6 +78,7 @@ for t in range(problem.T):
             taxi_rides[taxi].append(ride)
             taxi_free_from[taxi] = end_time(taxi, ride)
             taxi_position[taxi] = [ride.x, ride.y]
+            taxi_idle_time[taxi] = end_time(taxi, ride)
             current_ride += 1
             if current_ride >= len(rides_by_start):
                 break
