@@ -1,4 +1,5 @@
 import sys
+from tqdm import tqdm
 
 input_file, output_file = sys.argv[1:3]
 
@@ -51,7 +52,7 @@ with open(input_file, "r") as f:
 cars = [Vehicle(idx) for idx in range(VEHICLES)]
 
 
-while STEPS > 0 and len(ride_list) > 0:
+for step in tqdm(range(STEPS)):
     for car in cars:
         if car.steps_left == 0:
             if len(car.rides_done) > 0:
@@ -64,15 +65,15 @@ while STEPS > 0 and len(ride_list) > 0:
             )
             ride = ride_list.pop()
             car.steps_left = ride.distance
-            car.rides_done.append(ride)
+            if ride.distance <= STEPS:
+                car.rides_done.append(ride)
 
         car.steps_left -= 1
-        STEPS -= 1
 
 
 
 with open(output_file, "w") as f:
     for car in cars:
         M = len(car.rides_done)
-        rides_idxes = " ".join([str(i.idx) for i in car.rides_done])
+        rides_idxes = " ".join([str(ride.idx) for ride in car.rides_done])
         f.write(f'{M} {rides_idxes}\n')
