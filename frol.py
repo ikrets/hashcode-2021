@@ -102,6 +102,7 @@ class Graph:
 graph = Graph()
 for street in Streets.values():
     graph.add_street(street)
+graph.update_durations()
 
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission_{total_score}.out'
