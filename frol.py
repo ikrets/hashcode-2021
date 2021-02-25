@@ -83,11 +83,11 @@ class Light:
     duration: float
 
 class Graph:
-    i_to_ligts = defaultdict(list)
+    i_to_lights = defaultdict(list)
 
     def add_street(self, s: Street):
         l = Light(s, 0.5)
-        i_to_s[s.E].append(l)
+        i_to_lights[s.E].append(l)
 
     def update_durations(self):
         # TODO me
