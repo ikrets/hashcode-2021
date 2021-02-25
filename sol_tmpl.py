@@ -35,7 +35,7 @@ class Street:
     B: int
     E: int
     name: str
-    F: int
+    L: int
 
 
 @dataclass
@@ -65,7 +65,7 @@ assert S == len(Streets)
 assert V == len(Cars)
 
 total_score = 0
-solution = []
+Solution = []
 
 d = 0
 while d <= D:
@@ -73,5 +73,5 @@ while d <= D:
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission_{total_score}.out'
 with open(out_file, 'w') as fo:
-    g = ( ''.join(str(_) + '\n' for _ in solution ))
+    g = ( ''.join(str(_) + '\n' for _ in Solution ))
     fo.writelines(g)
