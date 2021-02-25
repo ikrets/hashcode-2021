@@ -96,6 +96,9 @@ class Graph:
             total_enc = sum(
                 [traf_light.s.encountered for traf_light in self.i_to_lights[intrsc]]
             )
+            if not total_enc:
+                continue
+
             for traf_light in self.i_to_lights[intrsc]:
                 traf_light.duration = traf_light.s.encountered / total_enc
 
@@ -104,6 +107,8 @@ for street in Streets.values():
     graph.add_street(street)
 graph.update_durations()
 
+tau = 0.0001
+
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission_{total_score}.out'
 with open(out_file, 'w') as fo:
@@ -111,10 +116,14 @@ with open(out_file, 'w') as fo:
 
     for i, lights in graph.i_to_lights.items():
         total_sum = sum(l.duration for l in lights)
-        min_duration = min(l.duration for l in lights)
-        multiplicator = 1 / min_duration
+        multiplicator = D * tau / total_sum
+        filtered_lights = []
+        for l in lights:
+            l.duration = round(multiplicator * l.duration)
+            if l.duration >= 1:
+                filtered_lights.append(l)
 
         fo.write(f"{i}\n")
-        fo.write(f"{len(lights)}\n")
-        for light in lights:
-            fo.write(f"{light.s.name} {round(light.duration * multiplicator)}\n")
+        fo.write(f"{len(filtered_lights)}\n")
+        for light in filtered_lights:
+            fo.write(f"{light.s.name} {light.duration}\n")
