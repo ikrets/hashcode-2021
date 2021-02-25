@@ -3,8 +3,8 @@ from collections import namedtuple
 from dataclasses import dataclass
 from itertools import chain
 from pprint import pprint
-import pandas as pd
-from tqdm import tqdm
+# import pandas as pd
+# from tqdm import tqdm
 import random
 from typing import List
 
@@ -50,7 +50,7 @@ class Car:
 
     @property
     def time(self):
-        return sum([street.L for street in self.path])
+        return sum([Streets[street].L for street in self.path])
 
 
 Streets = {}
@@ -112,7 +112,7 @@ class Graph:
                 continue
 
             for traf_light in self.i_to_lights[intrsc]:
-                traf_light.duration = traf_light.s.encountered / total_enc
+                traf_light.duration = max(traf_light.s.encountered / total_enc, 0.1)
 
 graph = Graph()
 for street in Streets.values():
