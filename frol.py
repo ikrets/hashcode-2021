@@ -90,9 +90,12 @@ class Graph:
         i_to_lights[s.E].append(l)
 
     def update_durations(self):
-        # TODO me
-        pass
-
+        for intrsc in self.i_to_lights:
+            total_enc = sum(
+                [traf_light.s.encountered for traf_light in i_to_lights[intrsc]]
+            )
+            for traf_light in intrsc:
+                traf_light.duration = traf_light.s.encountered / total_enc
 
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission_{total_score}.out'
