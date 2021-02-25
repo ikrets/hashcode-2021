@@ -107,9 +107,9 @@ for street in Streets.values():
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission_{total_score}.out'
 with open(out_file, 'w') as fo:
-    fo.write(f"{len(graph.i_to_ligts)}\n")
+    fo.write(f"{len(graph.i_to_lights)}\n")
 
-    for i, lights in graph.i_to_ligts.items():
+    for i, lights in graph.i_to_lights.items():
         total_sum = sum(l.duration for l in lights)
         min_duration = min(l.duration for l in lights)
         multiplicator = 1 / min_duration
