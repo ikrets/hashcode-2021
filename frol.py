@@ -96,7 +96,7 @@ class Graph:
             total_enc = sum(
                 [traf_light.s.encountered for traf_light in self.i_to_lights[intrsc]]
             )
-            for traf_light in intrsc:
+            for traf_light in self.i_to_lights[intrsc]:
                 traf_light.duration = traf_light.s.encountered / total_enc
 
 graph = Graph()
