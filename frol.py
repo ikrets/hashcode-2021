@@ -80,7 +80,7 @@ while d <= D:
 
 class Light:
     s: Street
-    duration: int
+    duration: float
 
 class Graph:
     i_to_ligts = defaultdict(list)
