@@ -38,6 +38,8 @@ class Street:
     E: int
     name: str
     F: int
+    encountered: int
+
 
 
 @dataclass
@@ -53,13 +55,16 @@ with open(in_file) as fin:
 
     for _ in range(S):
         B, E, name, L = fin.readline().split()
-        Streets[name] = Street(len(Streets), int(B), int(E), name, int(L))
+        Streets[name] = Street(len(Streets), int(B), int(E), name, int(L), 0)
 
     for _ in range(V):
         P, *streets = fin.readline().split()
         assert len(streets) > 0, f'{P} {streets}'
         Cars.append(Car(len(Cars), streets))
         assert all(_ in Streets for _ in Cars[-1].path)
+        for street in car.path:
+            Streets[street].encountered += 1
+
 
 print(f'Simulation Time: {D}, Intersections: {I}, Streets: {S}, Cars: {V}, Bonus: {F}\n')
 
