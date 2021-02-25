@@ -60,7 +60,8 @@ with open(in_file) as fin:
     for _ in range(V):
         P, *streets = fin.readline().split()
         assert len(streets) > 0, f'{P} {streets}'
-        Cars.append(Car(len(Cars), streets))
+        car = Car(len(Cars), streets)
+        Cars.append(car)
         assert all(_ in Streets for _ in Cars[-1].path)
         for street in car.path:
             Streets[street].encountered += 1
