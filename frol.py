@@ -78,6 +78,7 @@ d = 0
 while d <= D:
     d += 1
 
+@dataclass
 class Light:
     s: Street
     duration: float
@@ -87,18 +88,35 @@ class Graph:
 
     def add_street(self, s: Street):
         l = Light(s, 0.5)
-        i_to_lights[s.E].append(l)
+        self.i_to_lights[s.E].append(l)
 
     def update_durations(self):
         for intrsc in self.i_to_lights:
             total_enc = sum(
-                [traf_light.s.encountered for traf_light in i_to_lights[intrsc]]
+                [traf_light.s.encountered for traf_light in self.i_to_lights[intrsc]]
             )
             for traf_light in intrsc:
                 traf_light.duration = traf_light.s.encountered / total_enc
 
+solution = []
+graph = Graph()
+for street in Streets.values():
+    graph.add_street(street)
+
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission_{total_score}.out'
 with open(out_file, 'w') as fo:
+    fo.write(f"{len(graph.i_to_ligts)}\n")
+
+    for i, lights in graph.i_to_ligts.items():
+        total_sum = sum(l.duration for l in lights)
+        min_duration = min(l.duration for l in lights)
+        multiplicator = 1 / min_duration
+
+        fo.write(f"{i}\n")
+        fo.write(f"{len(lights)}\n")
+        for light in lights:
+            fo.write(f"{light.s.name} {round(light.duration * multiplicator)}\n")
+
     g = ( ''.join(str(_) + '\n' for _ in solution ))
     fo.writelines(g)
