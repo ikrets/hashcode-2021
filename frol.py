@@ -37,8 +37,9 @@ class Street:
     B: int
     E: int
     name: str
-    F: int
+    L: int
     encountered: int
+    weight: int
 
 
 
@@ -46,6 +47,11 @@ class Street:
 class Car:
     id_: int
     path: List[str]
+
+    @property
+    def time(self):
+        return sum([street.L for street in self.path])
+
 
 Streets = {}
 Cars = []
@@ -55,7 +61,7 @@ with open(in_file) as fin:
 
     for _ in range(S):
         B, E, name, L = fin.readline().split()
-        Streets[name] = Street(len(Streets), int(B), int(E), name, int(L), 0)
+        Streets[name] = Street(len(Streets), int(B), int(E), name, int(L), 0, 0)
 
     for _ in range(V):
         P, *streets = fin.readline().split()
@@ -65,6 +71,12 @@ with open(in_file) as fin:
         assert all(_ in Streets for _ in Cars[-1].path)
         for street in car.path:
             Streets[street].encountered += 1
+
+
+fastest_path = min([car.time for car in Cars])
+for car in Cars:
+    for street in car.path:
+        Streets[street].weight += car.time
 
 
 print(f'Simulation Time: {D}, Intersections: {I}, Streets: {S}, Cars: {V}, Bonus: {F}\n')
