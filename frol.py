@@ -99,7 +99,6 @@ class Graph:
             for traf_light in intrsc:
                 traf_light.duration = traf_light.s.encountered / total_enc
 
-solution = []
 graph = Graph()
 for street in Streets.values():
     graph.add_street(street)
@@ -118,6 +117,3 @@ with open(out_file, 'w') as fo:
         fo.write(f"{len(lights)}\n")
         for light in lights:
             fo.write(f"{light.s.name} {round(light.duration * multiplicator)}\n")
-
-    g = ( ''.join(str(_) + '\n' for _ in solution ))
-    fo.writelines(g)
