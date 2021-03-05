@@ -57,6 +57,8 @@ class Intersection:
     streets_in: List[Street]
     streets_out: List[Street]
     timeline: List[Tuple[int, Street]]
+    slots: Dict[int, Optional[str]]
+    street_to_slot: Dict[str, int]
 
 Streets = {}
 Cars = []
@@ -65,7 +67,9 @@ Cars = []
 with open(in_file) as fin:
     D, I, S, V, F = map(int, fin.readline().split())
     Intersections = {index: Intersection(index=index, streets_in=[], streets_out=[],
-                                         timeline=[])
+                                         timeline=[],
+                                         slots=defaultdict(lambda: None),
+                                         street_to_slot={})
                     for index in range(I)}
 
     for _ in range(S):
@@ -83,6 +87,10 @@ with open(in_file) as fin:
         assert all(_ in Streets for _ in Cars[-1].path)
         for street in car.path[:-1]:
             Streets[street].encountered += 1
+
+for intersection in Intersections.values():
+    intersection.streets_in = [s for s in intersection.streets_in if s.encountered]
+    intersection.streets_out = [s for s in intersection.streets_out if s.encountered]
 
 @dataclass
 class StreetOpen:
@@ -110,7 +118,7 @@ def simulate_schedules(solution):
 
     street_to_open_times: Dict[str, StreetOpen] = {}
     for _, streets in solution.items():
-        for i, street in enumerate(streets):
+        for i, street in streets.items():
             street_to_open_times[street] = StreetOpen(ts=set([i]), period=len(streets))
 
     for t in range(D):
@@ -159,59 +167,40 @@ def simulate_schedules(solution):
     return early_bonus, completion_bonus, car_intersection_waiting_time, intersection_miss_open_slot
 
 cars_to_path_length = {c.id_: sum(Streets[s].L for s in c.path) for c in Cars}
-cars_by_path_length = sorted(Cars, key=lambda c: sum(Streets[s].L for s in c.path))
+cars_by_path_length = sorted(Cars, key=lambda c: sum(Streets[s].L for s in c.path), reverse=True)
+
 for car in cars_by_path_length:
+    new_slot_distance = []
+    existing_slot_distance = []
+
     t = 0
     for i, street_name in enumerate(car.path[:-1]):
         street = Streets[street_name]
+        intersection = Intersections[street.E]
+
+        if street_name not in intersection.street_to_slot:
+            if intersection.slots[t % len(intersection.streets_in)] is not None:
+                for j in range(1, len(intersection.streets_in)):
+                    slot = (t + j) % len(intersection.streets_in)
+                    if intersection.slots[slot] is None:
+                        t += j
+                        break
+
+            intersection.slots[t % len(intersection.streets_in)] = street_name
+            intersection.street_to_slot[street_name] = t % len(intersection.streets_in)
+
+        else:
+            slot = intersection.street_to_slot[street_name]
+            wait = (slot - t) % len(intersection.streets_in)
+            t += wait
+
         Intersections[street.E].timeline.append((t, street))
         t += Streets[car.path[i + 1]].L
 
-timelines = {index: [None for _ in range(D)] for index in range(I)}
-max_timeline_step = {index: 0 for index in range(I)}
-collisions = 0
-for index, intersection in Intersections.items():
-    for t, street_name in intersection.timeline:
-        if timelines[index][t] is None:
-            timelines[index][t] = street_name
-            max_timeline_step[index] = max(t, 
-                                           max_timeline_step[index])
-        else:
-            for tt in range(t + 1, D):
-                if timelines[index][tt] is None:
-                    timelines[index][tt] = street_name
-                    max_timeline_step[index] = max(tt, 
-                                                max_timeline_step[index])
-                    break
-        
-
-trials = 100
-cores = 8
-
-def calculate(index):
-    solution = {}
-    non_empty_streets = [s.name for s in Intersections[index].streets_in
-                            if Streets[s.name].encountered]
-    min_lateness = float("inf")
-    for _ in range(trials):
-        schedule = np.random.permutation(non_empty_streets)
-        where_street = {s: i for i, s in enumerate(schedule)}
-        lateness = 0
-
-        for t, street in Intersections[index].timeline:
-            lateness += (t % len(schedule) - where_street[street.name]) % len(schedule)
-        
-        if lateness < min_lateness:
-            min_lateness = lateness
-            solution[index] = schedule
-    
-    return solution
-
-pool = multiprocessing.Pool(processes=cores)
 solution = {}
-for index_solution in tqdm(pool.imap_unordered(calculate, np.arange(I)),
-                           total=I):
-    solution.update(index_solution)
+for intersection in Intersections.values():
+    solution[intersection.index] = intersection.slots 
+    assert all(s for s in intersection.slots.values())
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission.out'
 solution = {index: streets for index, streets in solution.items() if len(streets)}
@@ -226,7 +215,7 @@ for (car_id, interesection_id), waiting_time in car_intersection_waiting_time.it
 sorted_by_length = sorted(range(I), key=lambda i: len(Intersections[i].streets_in), reverse=True)
 
 import matplotlib.pyplot as plt
-fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+fig, axes = plt.subplots(1, 3, figsize=(10, 10))
 axes[0].plot([np.mean(intersection_total_waiting_time[i]) for i in sorted_by_length])
 axes[0].set_title("average waiting time")
 axes[1].plot([np.mean(interesection_miss_open_slot[i]) for i in sorted_by_length])
