@@ -7,8 +7,9 @@ import pandas as pd
 from tqdm import tqdm
 import random
 import numpy as np
-from typing import List, Optional, Tuple
+from typing import Deque, List, Optional, Set, Tuple, Dict
 import multiprocessing
+from collections import deque
 
 from collections import defaultdict
 
@@ -60,6 +61,7 @@ class Intersection:
 Streets = {}
 Cars = []
 
+
 with open(in_file) as fin:
     D, I, S, V, F = map(int, fin.readline().split())
     Intersections = {index: Intersection(index=index, streets_in=[], streets_out=[],
@@ -82,6 +84,81 @@ with open(in_file) as fin:
         for street in car.path[:-1]:
             Streets[street].encountered += 1
 
+@dataclass
+class StreetOpen:
+    ts: Set[int]
+    period: int
+
+@dataclass
+class CarPosition:
+    car_id: int
+    current_path_i: int
+    current_eta: int
+
+def simulate_schedules(solution):
+    street_queues: Dict[str, Deque[CarPosition]] = defaultdict(deque)
+    street_transit: Dict[str, Set[CarPosition]] = defaultdict(list)
+    car_intersection_waiting_time: Dict[Tuple[int, int], int] = defaultdict(lambda: 0)
+    intersection_miss_open_slot: Dict[int, List[int]] = defaultdict(list)
+
+    early_bonus = 0
+    completion_bonus = 0
+
+    for car in Cars:
+        street_queues[car.path[0]].appendleft(CarPosition(car_id=car.id_, current_path_i=0,
+                                                      current_eta=0))
+
+    street_to_open_times: Dict[str, StreetOpen] = {}
+    for _, streets in solution.items():
+        for i, street in enumerate(streets):
+            street_to_open_times[street] = StreetOpen(ts=set([i]), period=len(streets))
+
+    for t in range(D):
+        street_names = list(street_queues.keys())
+        for street_name in street_names:
+            queue = street_queues[street_name]
+            if not queue:
+                continue
+
+            open_times = street_to_open_times[street_name]
+            if t % open_times.period in open_times.ts:
+                leaving_car = queue.pop()
+                leaving_car.current_path_i += 1
+                next_street_name = Cars[leaving_car.car_id].path[leaving_car.current_path_i]
+                leaving_car.current_eta = Streets[next_street_name].L
+                street_transit[next_street_name].append(leaving_car)
+
+            for car in queue:
+                car_intersection_waiting_time[(car.car_id, Streets[street_name].E)] += 1
+            
+            if not queue:
+                street_queues.pop(street_name)
+
+        street_names = list(street_transit.keys())
+        for street_name in street_names:
+            transits = street_transit[street_name]
+
+            for transit in transits:
+                transit.current_eta -= 1
+                if transit.current_eta == 0:
+                    transits.remove(transit)
+                    if not street_transit[street_name]:
+                        street_transit.pop(street_name)
+
+                    # car has arrived
+                    if len(Cars[transit.car_id].path) == transit.current_path_i + 1:
+                        completion_bonus += F
+                        early_bonus += D - t
+                    else:
+                        street_queues[street_name].appendleft(transit)
+                        open_times = street_to_open_times[street_name]
+                        missed_open_times = [missed_t for missed_t in open_times.ts if missed_t <= (t + 1) % open_times.period]
+                        missed = max(missed_open_times) if missed_open_times else max(open_times.ts)
+                        intersection_miss_open_slot[Streets[street_name].E].append((t + 1 - missed) % open_times.period)
+
+    return early_bonus, completion_bonus, car_intersection_waiting_time, intersection_miss_open_slot
+
+cars_to_path_length = {c.id_: sum(Streets[s].L for s in c.path) for c in Cars}
 cars_by_path_length = sorted(Cars, key=lambda c: sum(Streets[s].L for s in c.path))
 for car in cars_by_path_length:
     t = 0
@@ -108,7 +185,7 @@ for index, intersection in Intersections.items():
                     break
         
 
-trials = 10000
+trials = 100
 cores = 8
 
 def calculate(index):
@@ -138,6 +215,27 @@ for index_solution in tqdm(pool.imap_unordered(calculate, np.arange(I)),
 
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission.out'
 solution = {index: streets for index, streets in solution.items() if len(streets)}
+
+early_bonus, completion_bonus, car_intersection_waiting_time, interesection_miss_open_slot = simulate_schedules(solution)
+print(f"Early bonus: {early_bonus}, completion bonus: {completion_bonus}")
+
+intersection_total_waiting_time = defaultdict(list)
+for (car_id, interesection_id), waiting_time in car_intersection_waiting_time.items():
+    intersection_total_waiting_time[interesection_id].append(waiting_time)
+
+sorted_by_length = sorted(range(I), key=lambda i: len(Intersections[i].streets_in), reverse=True)
+
+import matplotlib.pyplot as plt
+fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+axes[0].plot([np.mean(intersection_total_waiting_time[i]) for i in sorted_by_length])
+axes[0].set_title("average waiting time")
+axes[1].plot([np.mean(interesection_miss_open_slot[i]) for i in sorted_by_length])
+axes[1].set_title("average late to the open slot")
+axes[2].plot([len(Intersections[i].streets_in) for i in sorted_by_length])
+axes[2].set_title("intersection size")
+plt.tight_layout()
+plt.savefig("intersection_waiting_size.png")
+
 with open(out_file, 'w') as fo:
     fo.write(f"{len(solution)}\n")
 
