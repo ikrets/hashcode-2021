@@ -91,7 +91,6 @@ with open(in_file) as fin:
 for intersection in Intersections.values():
     intersection.streets_in = [s for s in intersection.streets_in if s.encountered]
     intersection.streets_out = [s for s in intersection.streets_out if s.encountered]
-
 @dataclass
 class StreetOpen:
     ts: Set[int]
@@ -103,11 +102,9 @@ class CarPosition:
     current_path_i: int
     current_eta: int
 
-def simulate_schedules(solution):
+def simulate_schedules():
     street_queues: Dict[str, Deque[CarPosition]] = defaultdict(deque)
     street_transit: Dict[str, Set[CarPosition]] = defaultdict(list)
-    car_intersection_waiting_time: Dict[Tuple[int, int], int] = defaultdict(lambda: 0)
-    intersection_miss_open_slot: Dict[int, List[int]] = defaultdict(list)
 
     early_bonus = 0
     completion_bonus = 0
@@ -116,11 +113,6 @@ def simulate_schedules(solution):
         street_queues[car.path[0]].appendleft(CarPosition(car_id=car.id_, current_path_i=0,
                                                       current_eta=0))
 
-    street_to_open_times: Dict[str, StreetOpen] = {}
-    for _, streets in solution.items():
-        for i, street in streets.items():
-            street_to_open_times[street] = StreetOpen(ts=set([i]), period=len(streets))
-
     for t in range(D):
         street_names = list(street_queues.keys())
         for street_name in street_names:
@@ -128,17 +120,25 @@ def simulate_schedules(solution):
             if not queue:
                 continue
 
-            open_times = street_to_open_times[street_name]
-            if t % open_times.period in open_times.ts:
+            intersection = Intersections[Streets[street_name].E]
+            period = len(intersection.streets_in)
+            if street_name not in intersection.street_to_slot:
+                if intersection.slots[t % period] is None:
+                    intersection.slots[t % period] = street_name
+                    intersection.street_to_slot[street_name] = t % period
+                    exiting = True
+                else:
+                    exiting = False
+            else:
+                exiting = intersection.street_to_slot[street_name] == t % period
+
+            if exiting:
                 leaving_car = queue.pop()
                 leaving_car.current_path_i += 1
                 next_street_name = Cars[leaving_car.car_id].path[leaving_car.current_path_i]
                 leaving_car.current_eta = Streets[next_street_name].L
                 street_transit[next_street_name].append(leaving_car)
 
-            for car in queue:
-                car_intersection_waiting_time[(car.car_id, Streets[street_name].E)] += 1
-            
             if not queue:
                 street_queues.pop(street_name)
 
@@ -159,43 +159,11 @@ def simulate_schedules(solution):
                         early_bonus += D - t
                     else:
                         street_queues[street_name].appendleft(transit)
-                        open_times = street_to_open_times[street_name]
-                        missed_open_times = [missed_t for missed_t in open_times.ts if missed_t <= (t + 1) % open_times.period]
-                        missed = max(missed_open_times) if missed_open_times else max(open_times.ts)
-                        intersection_miss_open_slot[Streets[street_name].E].append((t + 1 - missed) % open_times.period)
 
-    return early_bonus, completion_bonus, car_intersection_waiting_time, intersection_miss_open_slot
+    return early_bonus, completion_bonus
 
-cars_to_path_length = {c.id_: sum(Streets[s].L for s in c.path) for c in Cars}
-cars_by_path_length = sorted(Cars, key=lambda c: sum(Streets[s].L for s in c.path), reverse=True)
-
-for car in cars_by_path_length:
-    new_slot_distance = []
-    existing_slot_distance = []
-
-    t = 0
-    for i, street_name in enumerate(car.path[:-1]):
-        street = Streets[street_name]
-        intersection = Intersections[street.E]
-
-        if street_name not in intersection.street_to_slot:
-            if intersection.slots[t % len(intersection.streets_in)] is not None:
-                for j in range(1, len(intersection.streets_in)):
-                    slot = (t + j) % len(intersection.streets_in)
-                    if intersection.slots[slot] is None:
-                        t += j
-                        break
-
-            intersection.slots[t % len(intersection.streets_in)] = street_name
-            intersection.street_to_slot[street_name] = t % len(intersection.streets_in)
-
-        else:
-            slot = intersection.street_to_slot[street_name]
-            wait = (slot - t) % len(intersection.streets_in)
-            t += wait
-
-        Intersections[street.E].timeline.append((t, street))
-        t += Streets[car.path[i + 1]].L
+early_bonus, completion_bonus = simulate_schedules()
+print(f"Early bonus: {early_bonus}, completion bonus: {completion_bonus}")
 
 solution = {}
 for intersection in Intersections.values():
@@ -205,25 +173,6 @@ for intersection in Intersections.values():
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission.out'
 solution = {index: streets for index, streets in solution.items() if len(streets)}
 
-early_bonus, completion_bonus, car_intersection_waiting_time, interesection_miss_open_slot = simulate_schedules(solution)
-print(f"Early bonus: {early_bonus}, completion bonus: {completion_bonus}")
-
-intersection_total_waiting_time = defaultdict(list)
-for (car_id, interesection_id), waiting_time in car_intersection_waiting_time.items():
-    intersection_total_waiting_time[interesection_id].append(waiting_time)
-
-sorted_by_length = sorted(range(I), key=lambda i: len(Intersections[i].streets_in), reverse=True)
-
-import matplotlib.pyplot as plt
-fig, axes = plt.subplots(1, 3, figsize=(10, 10))
-axes[0].plot([np.mean(intersection_total_waiting_time[i]) for i in sorted_by_length])
-axes[0].set_title("average waiting time")
-axes[1].plot([np.mean(interesection_miss_open_slot[i]) for i in sorted_by_length])
-axes[1].set_title("average late to the open slot")
-axes[2].plot([len(Intersections[i].streets_in) for i in sorted_by_length])
-axes[2].set_title("intersection size")
-plt.tight_layout()
-plt.savefig("intersection_waiting_size.png")
 
 with open(out_file, 'w') as fo:
     fo.write(f"{len(solution)}\n")
