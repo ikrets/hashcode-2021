@@ -130,7 +130,7 @@ def simulate_solution(solution):
         street_names = list(street_queues.keys())
         for street_name in street_names:
             queue = street_queues[street_name]
-            if not queue:
+            if not queue or street_name not in street_to_open_times:
                 continue
 
             open_times = street_to_open_times[street_name]
@@ -164,10 +164,6 @@ def simulate_solution(solution):
                         early_bonus += D - t
                     else:
                         street_queues[street_name].appendleft(transit)
-                        open_times = street_to_open_times[street_name]
-                        missed_open_times = [missed_t for missed_t in open_times.ts if missed_t <= (t + 1) % open_times.period]
-                        missed = max(missed_open_times) if missed_open_times else max(open_times.ts)
-                        intersection_miss_open_slot[Streets[street_name].E].append((t + 1 - missed) % open_times.period)
 
     return early_bonus, completion_bonus
 
