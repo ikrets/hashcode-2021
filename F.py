@@ -1,5 +1,6 @@
 import os, sys
-from collections import namedtuple
+import math
+from collections import namedtuple, Counter
 from dataclasses import dataclass
 from itertools import chain, permutations, combinations_with_replacement, product
 from pprint import pprint
@@ -58,7 +59,8 @@ class Intersection:
     streets_out: List[Street]
     timeline: List[Tuple[int, Street]]
     slots: Dict[int, Optional[str]]
-    street_to_slot: Dict[str, int]
+    street_slotted: Set[str]
+    period = 0
 
 Streets = {}
 Cars = []
@@ -69,7 +71,7 @@ with open(in_file) as fin:
     Intersections = {index: Intersection(index=index, streets_in=[], streets_out=[],
                                          timeline=[],
                                          slots=defaultdict(lambda: None),
-                                         street_to_slot={})
+                                         street_slotted=set())
                     for index in range(I)}
 
     for _ in range(S):
@@ -103,11 +105,17 @@ class CarPosition:
     current_path_i: int
     current_eta: int
 
-def simulate_solution(solution):
+@dataclass
+class Timeframe:
+    street_visits: Dict[str, int]
+
+def simulate_solution(solution, timeframe_length):
     street_queues: Dict[str, Deque[CarPosition]] = defaultdict(deque)
     street_transit: Dict[str, Set[CarPosition]] = defaultdict(list)
-    car_intersection_waiting_time: Dict[Tuple[int, int], int] = defaultdict(lambda: 0)
-    intersection_miss_open_slot: Dict[int, List[int]] = defaultdict(list)
+
+    num_timeframes = D // timeframe_length + 1
+    timeframes = [Timeframe(street_visits=Counter()) for _ in range(num_timeframes)]
+    t_to_timeframe = lambda t: t // timeframe_length
 
     early_bonus = 0
     completion_bonus = 0
@@ -115,17 +123,21 @@ def simulate_solution(solution):
     for car in Cars:
         street_queues[car.path[0]].appendleft(CarPosition(car_id=car.id_, current_path_i=0,
                                                       current_eta=0))
+        timeframes[0].street_visits[car.path[0]] += 1
 
     street_to_open_times: Dict[str, StreetOpen] = {}
     for _, streets in solution.items():
         for i, street in streets.items():
-            street_to_open_times[street] = StreetOpen(ts=set([i]), period=len(streets))
+            if street not in street_to_open_times:
+                street_to_open_times[street] = StreetOpen(ts=set([i]), period=len(streets))
+            else:
+                street_to_open_times[street].ts.add(i)
 
     for t in range(D):
         street_names = list(street_queues.keys())
         for street_name in street_names:
             queue = street_queues[street_name]
-            if not queue:
+            if not queue or street_name not in street_to_open_times:
                 continue
 
             open_times = street_to_open_times[street_name]
@@ -135,73 +147,7 @@ def simulate_solution(solution):
                 next_street_name = Cars[leaving_car.car_id].path[leaving_car.current_path_i]
                 leaving_car.current_eta = Streets[next_street_name].L
                 street_transit[next_street_name].append(leaving_car)
-
-            for car in queue:
-                car_intersection_waiting_time[(car.car_id, Streets[street_name].E)] += 1
-            
-            if not queue:
-                street_queues.pop(street_name)
-
-        street_names = list(street_transit.keys())
-        for street_name in street_names:
-            transits = street_transit[street_name]
-
-            for transit in transits:
-                transit.current_eta -= 1
-                if transit.current_eta == 0:
-                    transits.remove(transit)
-                    if not street_transit[street_name]:
-                        street_transit.pop(street_name)
-
-                    # car has arrived
-                    if len(Cars[transit.car_id].path) == transit.current_path_i + 1:
-                        completion_bonus += F
-                        early_bonus += D - t
-                    else:
-                        street_queues[street_name].appendleft(transit)
-                        open_times = street_to_open_times[street_name]
-                        missed_open_times = [missed_t for missed_t in open_times.ts if missed_t <= (t + 1) % open_times.period]
-                        missed = max(missed_open_times) if missed_open_times else max(open_times.ts)
-                        intersection_miss_open_slot[Streets[street_name].E].append((t + 1 - missed) % open_times.period)
-
-    return early_bonus, completion_bonus, car_intersection_waiting_time, intersection_miss_open_slot
-
-def simulate_schedules():
-    street_queues: Dict[str, Deque[CarPosition]] = defaultdict(deque)
-    street_transit: Dict[str, Set[CarPosition]] = defaultdict(list)
-
-    early_bonus = 0
-    completion_bonus = 0
-
-    for car in Cars:
-        street_queues[car.path[0]].appendleft(CarPosition(car_id=car.id_, current_path_i=0,
-                                                      current_eta=0))
-
-    for t in range(D):
-        street_names = list(street_queues.keys())
-        for street_name in street_names:
-            queue = street_queues[street_name]
-            if not queue:
-                continue
-
-            intersection = Intersections[Streets[street_name].E]
-            period = len(intersection.streets_in)
-            if street_name not in intersection.street_to_slot:
-                if intersection.slots[t % period] is None:
-                    intersection.slots[t % period] = street_name
-                    intersection.street_to_slot[street_name] = t % period
-                    exiting = True
-                else:
-                    exiting = False
-            else:
-                exiting = intersection.street_to_slot[street_name] == t % period
-
-            if exiting:
-                leaving_car = queue.pop()
-                leaving_car.current_path_i += 1
-                next_street_name = Cars[leaving_car.car_id].path[leaving_car.current_path_i]
-                leaving_car.current_eta = Streets[next_street_name].L
-                street_transit[next_street_name].append(leaving_car)
+                timeframes[t_to_timeframe(t)].street_visits[street_name] += 1
 
             if not queue:
                 street_queues.pop(street_name)
@@ -224,32 +170,70 @@ def simulate_schedules():
                     else:
                         street_queues[street_name].appendleft(transit)
 
-    return early_bonus, completion_bonus
-
-# early_bonus, completion_bonus = simulate_schedules()
-# print(f"Early bonus: {early_bonus}, completion bonus: {completion_bonus}")
+    return early_bonus, completion_bonus, timeframes
 
 solution = {}
-for index, intersection in Intersections.items():
-    total_len = sum(s.L for s in intersection.streets_in)
-    solution[index] = {}
-    t = 0
-    for street in intersection.streets_in:
-        for i in range(street.L):
-            solution[index][t] = street.name
-            t += 1
-            
-            
-early_bonus, completion_bonus, _, _ = simulate_solution(solution)
-print(f"Early bonus: {early_bonus}, completion bonus: {completion_bonus}, total: {early_bonus + completion_bonus}")
 
-solution = {}
 for intersection in Intersections.values():
-    solution[intersection.index] = intersection.slots 
+    if not intersection.streets_in:
+        continue
+
+    total_encountered = sum(s.encountered for s in intersection.streets_in)
+    min_encountered = min(s.encountered for s in intersection.streets_in)
+
+    multiplier = 1 / min_encountered
+    schedule = [round(s.encountered / min_encountered) for s in intersection.streets_in]
+    
+    slots = {}
+    t = 0
+    for i, street_schedule in enumerate(schedule):
+        for _ in range(street_schedule):
+            slots[t] = intersection.streets_in[i].name
+            t += 1
+
+    solution[intersection.index] = slots 
     assert all(s for s in intersection.slots.values())
 
+timeframe_length = 50
+early_bonus, completion_bonus, timeframes = simulate_solution(solution, timeframe_length=timeframe_length)
+print(f"Early bonus: {early_bonus}, completion bonus: {completion_bonus}. Total: {early_bonus + completion_bonus}")
+
+for improve_iter in range(10):
+    new_solution = {}
+    for intersection in Intersections.values():
+        if not intersection.streets_in:
+            continue
+
+        street_stats = defaultdict(list)
+        for timeframe in timeframes:
+            timeframe_stats = [timeframe.street_visits[street.name] for street in intersection.streets_in]
+            min_visited = max(min(timeframe_stats), 1)
+
+            for street in intersection.streets_in:
+                street_stats[street.name].append(timeframe.street_visits[street.name] // min_visited)
+        
+        street_stats = {street_name: np.mean(stats) for street_name, stats in street_stats.items()}
+        min_street_stat = max(min(street_stats.values()), 1)
+        if not min_street_stat:
+            continue
+
+        slots = {}
+        t = 0
+        for street_name, stats in street_stats.items():
+            duration = round(stats / min_street_stat)
+            duration = max(duration, 1)
+            for _ in range(duration):
+                slots[t] = street_name
+                t += 1
+
+        new_solution[intersection.index] = slots 
+        assert set(slots.values()) == set(solution[intersection.index].values())
+
+    early_bonus, completion_bonus, timeframes = simulate_solution(new_solution, timeframe_length=timeframe_length)
+    print(f"Iteration {improve_iter}: Early bonus: {early_bonus}, completion bonus: {completion_bonus}. Total: {early_bonus + completion_bonus}")
+    solution = new_solution
+
 out_file = os.path.splitext(os.path.basename(in_file))[0] + f'_submission.out'
-solution = {index: streets for index, streets in solution.items() if len(streets)}
 
 
 with open(out_file, 'w') as fo:
@@ -258,6 +242,16 @@ with open(out_file, 'w') as fo:
     for intersection_index, streets in solution.items():
         if len(streets):
             fo.write(f"{intersection_index}\n")
-            fo.write(f"{len(streets)}\n")
-            for i in range(len(streets)):
-                fo.write(f"{streets[i]} 1\n")
+            fo.write(f"{len(set(streets.values()))}\n")
+            prev_street = None
+            prev_street_len = 0
+            for t in range(len(streets)):
+                if streets[t] != prev_street:
+                    if prev_street is not None:
+                        fo.write(f"{prev_street} {prev_street_len}\n")
+                    prev_street = streets[t]
+                    prev_street_len = 1
+                else:
+                    prev_street_len += 1
+
+            fo.write(f"{prev_street} {prev_street_len}\n")
