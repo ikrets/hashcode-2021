@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os, sys
 from collections import defaultdict, namedtuple, Counter, deque
 from dataclasses import dataclass, field
