@@ -46,12 +46,11 @@ Streets: Dict[str, Street] = {}
 @dataclass
 class Car:
     path: List[str]
-    # pos: Tuple[int, int] = field(init=False)
 
 Cars: List[Car] = []
 
-stat_path_length = Counter()
-stat_street_end = Counter()
+stat_first_path_street = Counter()
+stat_intersection_street = Counter()
 stat_car_end_street = Counter()
 stat_cars_through_intersectoin = Counter()
 
@@ -62,7 +61,7 @@ with open(in_file) as fin:
     for _ in range(S):
         B, E, name, L = fin.readline().split()
         Streets[name] = Street(len(Streets), int(B), int(E), name, int(L))
-        stat_street_end[E] += 1
+        stat_intersection_street[E] += 1
 
     for v in range(V):
         P, *streets = fin.readline().split()
@@ -73,7 +72,7 @@ with open(in_file) as fin:
         tt = sum(Streets[s].L for s in streets[1:])
         upper_bound_score += F + (D - tt) if tt <= D else 0
 
-        stat_path_length[streets[1]] += 1
+        stat_first_path_street[streets[1]] += 1
         stat_car_end_street[Streets[streets[-1]].B] += 1
 
         for s in streets:
@@ -85,10 +84,10 @@ assert V == len(Cars)
 print(f'\nSimulation Time: {D}, Intersections: {I}, Streets: {S}, Cars: {V}, Bonus: {F}')
 print(f'\nUpper bound total score: {upper_bound_score}')
 
-print(f'\nsecond_street: {len(stat_path_length)} {stat_path_length.most_common(10)}')
-print(f'\nstat_street_end: {len(stat_street_end)} {stat_street_end.most_common(10)}')
-print(f'\nstat_car_end_street: {len(stat_car_end_street)} {stat_car_end_street.most_common(10)}')
-print(f'\n stat_cars_through_intersectoin: {len(stat_cars_through_intersectoin)} {stat_cars_through_intersectoin.most_common(10)}')
+print(f'\nTop starting streets: {len(stat_first_path_street)} {stat_first_path_street.most_common(10)}')
+print(f'Top destination streets: {len(stat_car_end_street)} {stat_car_end_street.most_common(10)}')
+print(f'Biggest Intersections: {len(stat_intersection_street)} {stat_intersection_street.most_common(10)}')
+print(f'Busiest Intersections: {len(stat_cars_through_intersectoin)} {stat_cars_through_intersectoin.most_common(10)}')
 
 total_score = 0
 
@@ -107,7 +106,7 @@ class Intersection:
         if len(self.schedule) == 1:
             return next(iter(self.schedule.keys()))
 
-        t = t if t <= self.cycle_time else t % self.cycle_time
+        while t > self.cycle_time: t -= self.cycle_time
         for k, v in self.schedule.items():
             if t <= v:
                 return k
@@ -150,19 +149,20 @@ for i, car in enumerate(Cars):
 
 assert sum(1 for c in Cars if c) == sum(sum(len(l) for l in i.queues.values()) for i in Is if i) , f'{V} == {_s}'
 
+print('\nSimulating schedule...')
 total_score = 0
-for t in tqdm(range(D)):
+for t in tqdm(range(D+1)):
     for i, inter in enumerate(Is):
         if not inter:
             continue
 
-        street = inter.greenLight(t)
+        street = inter.greenLight(t+1)
         if TRACE: print(f'T[{t}] | inter: {i} - Green: {street}')
         if street not in inter.queues or not inter.queues[street]:
             continue
 
         car_id, arrival_time = inter.queues[street][0]
-        if TRACE: print(f'\tcar: {car_id} time: {arrival_time}')
+        if TRACE: print(f'\tcar [{car_id}] follows "{street}" At end at time: T{arrival_time}')
         if arrival_time > t:
             continue
 
@@ -174,8 +174,12 @@ for t in tqdm(range(D)):
 
         if not car.path:
             T = t + next_street.L
-            if T < D:
-                total_score += F + (D - T - 1)
+            if T <= D:
+                add = F + (D - T)
+                total_score += add
+                if TRACE: print(f'\t\t[+] Score: {add}')
+            else:
+                if TRACE: print(f'\t\t[-] Score: too late at {T}')
         else:
             next_inter_id = next_street.E
             Is[next_inter_id].queues[next_street_name].append((car_id, t + next_street.L))
